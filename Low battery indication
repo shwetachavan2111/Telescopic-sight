@@ -1,0 +1,55 @@
+/*
+ * Low Battery Indication
+ * LED should blink when battery voltages becomes less than or equal to 2V
+ */ 
+ 
+#include <avr/io.h>                              //includes the appropriate IO definitions
+#include <util/delay.h>                          //includes delay functions
+#include <avr/interrupt.h>                       //includes interrupt functions
+
+#define BATTERY_PIN  DDB2                        //To Read the Battery Voltage
+#define LED_PIN  DDB0                            //LED is connected to PB0 of AT tiny for Low Battery Indication
+#define Critical_V 624
+
+volatile uint16_t ADC_Result;                    //16 bit Global Variable to hold 10 bit ADC conversion result
+
+
+int main(void){
+	//Set Pin Direction
+	DDRB &= ~(1 << BATTERY_PIN);	         //Set battery pin PB2 as Analog Input(ADC1) 0: input
+	DDRB |= (1 << LED_PIN);  		 //Set LED pin PB0 as Output 1:Output
+	
+	//Set ADC channel to PB2 and Vref=Internal reference voltage
+	ADMUX |= (1 << MUX0)|(1 << REFS0);      
+	
+	//Set Division factor to 128(ADP[2:0]) and Enable ADC(ADEN) and Activate ADC Conversion Complete Interrupt (ADIE)
+	ADCSRA = (1 << ADPS0) | (1 << ADPS1) | (1 << ADPS2)|(1 << ADEN) | (1 << ADIE) ;
+	
+	//Global Interrupt Enable.This Enable I-bit in the Status Register(SREG)
+	sei(); 
+	
+	//Start the conversion(Single Conversion)
+	ADCSRA |= (1 << ADSC);
+	  
+	
+	//After the conversion is complete (ADIF is high)	
+	//The ADC Conversion Complete Interrupt is executed if the ADIE bit and the I-bit in SREG are set.
+	return 0;
+}
+
+//This will be called once conversion is completed and ADIF=1
+ISR(ADC_vect){
+	ADC_Result = (ADCH << 8) | ADCL;                 //Store 10 bit digital value in global variable ADC_Result
+	
+	if(ADC_Result <= Critical_V)                     //Check whether calculated digital value is less or equal to critical value   
+		LOW_Battery_Indication();          
+	else
+		ADCSRA |= (1 << ADSC);                  //Start the conversion again
+}
+
+//LED flashing indication for low battery (below 2V)
+void LOW_Battery_Indication(){
+	PORTB |= (1 << PB0);			        //Turn ON LED
+	_delay_ms(1000);
+	PORTB &= ~(1 << PB0);		                //Turn OFF LED 
+}
