@@ -1,0 +1,114 @@
+/* ---------------------------------------------------------------------
+ * PWM LED Brightness control and Low Battery Indication for ATtiny13.
+ * Pin configuration -
+ * PB1/OC0B: LED output (Pin 6)
+ * PB2/ADC1: Analog Input for Intensity Control
+ * PB4/ADC2: Battery Input
+ * -------------------------------------------------------------------*/
+ 
+// 9.6 MHz, built in resonator
+#define F_CPU 9600000
+#define LED PB1 
+ 
+//I/O and delay libraries
+#include <avr/io.h>
+#include <util/delay.h>
+ 
+unsigned int adc_read_battery(void){
+	 unsigned int adc_high;
+	 
+	 //DDRB  &= ~(1 << PB4);                                    //PB4 as Input
+	 
+	 DIDR0 &= ~(1 << ADC2D);						            //Enable PB4/ADC2 by putting zero
+	 ADMUX |= (1 << MUX1);			                            //Set the ADC Input to PB4/ADC2
+	 DIDR0 |= (1 << ADC0D)|(1 << ADC1D)|(1 << ADC3D);			//Disable other all ADC's by putting 1
+	 
+	 ADMUX |= (1 << ADLAR);			//Left adjusted ADC result
+	 ADMUX |= (1 << REFS0);			//Internal voltage reference 1.1V
+	 
+	 // Set the prescaler to clock/128 & enable ADC
+	 // At 9.6 MHz this is 75 kHz.
+	 ADCSRA |= (1 << ADPS2)| (1 << ADPS1) | (1 << ADPS0) | (1 << ADEN);
+	 
+	 // Start the conversion
+	 ADCSRA |= (1 << ADSC);
+	 
+	 // Wait for it to finish
+	 while (ADCSRA & (1 << ADSC));
+	 adc_high = ADCH;
+	 return adc_high;
+ }
+ 
+unsigned int adc_read_intensity (void){
+	unsigned int adc_high;
+	//DDRB  &= ~(1 << PB2 );                             //PB2 as Input
+	
+	DIDR0 &= ~(1 << ADC1D);                              //turn on ADC1D input which was disable in adc_read_battery function 
+	DIDR0 |= (1 << ADC0D)|(1 << ADC2D)|(1 << ADC3D);	 //Disable all other ADC's                
+	ADMUX |= (1 << MUX0);								 // Set the ADC input to PB2/ADC1
+	
+	ADMUX |= (1 << ADLAR);       //left adjusted adc result
+	ADMUX |= (1 << REFS0);      //Internal voltage reference
+   
+	// Set the prescaler to clock/128 & enable ADC 
+	// At 9.6 MHz this is 75 kHz.
+	ADCSRA |= (1 << ADPS2)| (1 << ADPS1) | (1 << ADPS0) | (1 << ADEN);
+   
+	// Start the conversion
+    ADCSRA |= (1 << ADSC);
+	
+	// Wait for it to finish
+    while (ADCSRA & (1 << ADSC));
+	adc_high = ADCH;
+    return adc_high;
+}
+
+
+void pwm_setup(void){
+    // Set Timer 0 prescaler to clock/8.
+    // At 9.6 MHz this is 1.2 MHz.
+    TCCR0B |= (1 << CS01);						//Clock Select Bit by Timer/Counter Control Register B
+ 
+    // Set to 'Fast PWM' mode
+    TCCR0A |= (1 << WGM01) | (1 << WGM00);     //Mode selection by Timer/Counter Control Register A
+ 
+    // Clear OC0B output on compare match, upwards counting.
+    TCCR0A |= (1 << COM0B1);
+}
+ 
+void pwm_write_intensity (unsigned int val){
+    OCR0B = val;
+}
+
+void pwm_write_battery (unsigned int val){
+	if(val<=150){			           //if voltage is less than 2V give indication
+		OCR0B = 128;
+		_delay_ms(500);
+		OCR0B = 0;
+		_delay_ms(500);
+	}	
+	else{}
+}
+ 
+int main(void){
+    unsigned int adc_in=0;
+	unsigned int adc_batt=0;
+ 
+    // LED is an output.
+    DDRB |= (1 << LED);                                 //Set LED Pin PB1 as output
+	
+    pwm_setup();										//set OCOB as FAST PWM output
+  
+    while (1) {
+		// Get the ADC value from PB4 = Battery voltage
+		adc_batt = adc_read_battery();					//ADC2 active other ADC's are disable
+		if(adc_batt >= 150){
+			adc_in = adc_read_intensity();              //ADC1 active other ADC's are disable
+			pwm_write_intensity(adc_in);				// Now write it to the PWM counter
+		}
+		else
+			pwm_write_battery(adc_batt);
+        }
+	
+	return 0;
+}
