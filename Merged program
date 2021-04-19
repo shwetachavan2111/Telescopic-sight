@@ -13,8 +13,8 @@
 #include <util/delay.h>
  
 void adc_setup (void){
-    ADMUX |= (1 << ADLAR);           //left adjusts for 8-bit resolution
-	  ADMUX |= (1 << REFS0);             //Internal voltage reference 1.1V
+    ADMUX |= (1 << ADLAR);             //left adjusts for 8-bit resolution
+    ADMUX |= (1 << REFS0);             //Internal voltage reference 1.1V
  
     // Set the prescaler to clock/128 & Enable ADC
     // At 9.6 MHz this is 75 kHz.
@@ -52,21 +52,20 @@ int main (void){
 	//DIDR0 |= (1 << ADC0D)|(1 << ADC1D)|(1 << ADC2D)|(1 << ADC3D); //to disable adc digital input 
 	
     while(1){
-		ADMUX |= (1 << MUX1);				     //Set the ADC input to PB4/ADC1 i.e Battery voltage
+	ADMUX |= (1 << MUX1);				     //Set the ADC input to PB4/ADC1 i.e Battery voltage
         adc_in = adc_read();				 //Get the ADC value from PB4 i.e Battery voltage
 		
         if(adc_in <= 170){					//if battery voltage is less than 2V give LED blinking indication  
-			OCR0B = 128;
-			_delay_ms(100);
-			OCR0B = 0;
-			_delay_ms(100);
-		}
-		
-		else if(adc_in > 170){
-			ADMUX |= (1 << MUX0);			//Set the ADC input to PB2/ADC2
-			adc_in = adc_read();			//Get the ADC value from PB2 i.e Intensity input
-			OCR0B =  adc_in;          //intensity control
-    }
+		OCR0B = 128;
+		_delay_ms(100);
+		OCR0B = 0;
+		_delay_ms(100);
 	}
+		
+	else if(adc_in > 170){
+		ADMUX |= (1 << MUX0);			//Set the ADC input to PB2/ADC2
+		adc_in = adc_read();			//Get the ADC value from PB2 i.e Intensity input
+		OCR0B =  adc_in;          //intensity control
+   }
 }
 
