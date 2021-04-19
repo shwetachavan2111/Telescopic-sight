@@ -1,0 +1,50 @@
+
+// 9.6 MHz, built in resonator
+#define F_CPU 9600000
+#define LED PB1
+
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+void adc_setup (void){
+	ADMUX |= (1 << MUX1);           // Set the ADC input to PB4/ADC1
+	ADMUX |= (1 << ADLAR);
+	ADMUX |= (1 << REFS0);
+	
+	// Set the prescaler to clock/128 & enable ADC
+	// At 9.6 MHz this is 75 kHz.
+	
+	ADCSRA |= (1 << ADPS2)|(1 << ADPS1) | (1 << ADPS0) | (1 << ADEN);
+}
+
+int adc_read (void){
+	// Start the conversion
+	ADCSRA |= (1 << ADSC);
+	
+	// Wait for it to finish
+	while (ADCSRA & (1 << ADSC));
+	
+	return ADCH;
+}
+
+int main (void){
+	int adc_in;
+	
+	// LED is an output.
+	DDRB |= (1 << LED);
+	
+	adc_setup();
+
+	while (1) {
+		// Get the ADC value
+		adc_in = adc_read();
+		// Now write it to the PWM counter
+		if(adc_in <=170){
+			PORTB |= _BV(LED);                        //LED ON
+		}
+		else if(adc_in > 170)
+			PORTB &= ~(_BV(LED));                    //LED OFF
+	}
+}
+
