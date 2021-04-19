@@ -3,7 +3,7 @@
  * PWM LED Brightness control for ATtiny13.
  * Pin configuration -
  * PB1/OC0B: LED output (Pin 6)
- * PB2/ADC1: Potentiometer input (Pin 7)
+ * PB2/ADC1: Intensity input (Pin 7)
  * -------------------------------------------------------------------*/
  
 // 9.6 MHz, built in resonator
@@ -50,7 +50,7 @@ void pwm_write (int val){
 }
  
 int main (void){
-    int adc_in;
+    unsigned int adc_in;
  
     // LED is an output.
     DDRB |= (1 << LED);  
