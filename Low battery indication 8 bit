@@ -1,20 +1,21 @@
+/*Low Battery Indication
+ *Below 2V we will be giving LED flashing 
+ */
 
 // 9.6 MHz, built in resonator
 #define F_CPU 9600000
 #define LED PB1
 
-
 #include <avr/io.h>
 #include <util/delay.h>
 
 void adc_setup (void){
-	ADMUX |= (1 << MUX1);           // Set the ADC input to PB4/ADC1
-	ADMUX |= (1 << ADLAR);
-	ADMUX |= (1 << REFS0);
+	ADMUX |= (1 << MUX1);              // Set the ADC input to PB4/ADC1
+	ADMUX |= (1 << ADLAR);             //left adjusted result
+	ADMUX |= (1 << REFS0);             //select internal voltage reference
 	
 	// Set the prescaler to clock/128 & enable ADC
 	// At 9.6 MHz this is 75 kHz.
-	
 	ADCSRA |= (1 << ADPS2)|(1 << ADPS1) | (1 << ADPS0) | (1 << ADEN);
 }
 
@@ -29,7 +30,7 @@ int adc_read (void){
 }
 
 int main (void){
-	int adc_in;
+	unsigned int adc_in;
 	
 	// LED is an output.
 	DDRB |= (1 << LED);
@@ -39,12 +40,14 @@ int main (void){
 	while (1) {
 		// Get the ADC value
 		adc_in = adc_read();
-		// Now write it to the PWM counter
 		if(adc_in <=170){
-			PORTB |= _BV(LED);                        //LED ON
-		}
+			PORTB |= _BV(LED);				//LED ON
+			//_delay_ms(100);
+			//PORTB &= ~(_BV(LED));	                       //LED off
+		} 
 		else if(adc_in > 170)
-			PORTB &= ~(_BV(LED));                    //LED OFF
+			PORTB &= ~(_BV(LED));			       //LED OFF
 	}
 }
+
 
