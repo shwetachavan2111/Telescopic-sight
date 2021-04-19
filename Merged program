@@ -1,0 +1,72 @@
+/* ---------------------------------------------------------------------
+ * LED Brightness control and Low Battery Indication for ATtiny13.
+ * Pin configuration -
+ * PB1/OC0B: LED output (Pin 6)
+ * PB2/ADC1: Intensity Input (Pin 7)
+ * PB4/ADC1: Battery Input 
+ * -------------------------------------------------------------------*/
+// 9.6 MHz, built in resonator
+#define F_CPU 9600000
+#define LED PB1 
+
+#include <avr/io.h>
+#include <util/delay.h>
+ 
+void adc_setup (void){
+    ADMUX |= (1 << ADLAR);           //left adjusts for 8-bit resolution
+	  ADMUX |= (1 << REFS0);             //Internal voltage reference 1.1V
+ 
+    // Set the prescaler to clock/128 & Enable ADC
+    // At 9.6 MHz this is 75 kHz.
+    ADCSRA |= (1 << ADPS2)| (1 << ADPS1) | (1 << ADPS0) | (1 << ADEN); 
+}
+ 
+int adc_read (void){
+    // Start the conversion
+    ADCSRA |= (1 << ADSC);
+    // Wait for it to finish
+    while (ADCSRA & (1 << ADSC));
+    return ADCH;
+}
+ 
+void pwm_setup (void){
+    // Set Timer 0 prescaler to clock/8.
+    // At 9.6 MHz this is 1.2 MHz.
+    TCCR0B |= (1 << CS01);
+	
+    // Set to 'Fast PWM' mode
+    TCCR0A |= (1 << WGM01) | (1 << WGM00);
+	
+    // Clear OC0B output on compare match, set OCBA at TOP
+    TCCR0A |= (1 << COM0B1);
+}
+ 
+int main (void){
+    int adc_in=0;
+    // LED is an output.
+    DDRB |= (1 << LED);  
+ 
+    adc_setup();
+    pwm_setup();
+	
+	//DIDR0 |= (1 << ADC0D)|(1 << ADC1D)|(1 << ADC2D)|(1 << ADC3D); //to disable adc digital input 
+	
+    while(1){
+		ADMUX |= (1 << MUX1);				     //Set the ADC input to PB4/ADC1 i.e Battery voltage
+        adc_in = adc_read();				 //Get the ADC value from PB4 i.e Battery voltage
+		
+        if(adc_in <= 170){					//if battery voltage is less than 2V give LED blinking indication  
+			OCR0B = 128;
+			_delay_ms(100);
+			OCR0B = 0;
+			_delay_ms(100);
+		}
+		
+		else if(adc_in > 170){
+			ADMUX |= (1 << MUX0);			//Set the ADC input to PB2/ADC2
+			adc_in = adc_read();			//Get the ADC value from PB2 i.e Intensity input
+			OCR0B =  adc_in;          //intensity control
+    }
+	}
+}
+
