@@ -1,0 +1,80 @@
+/* ---------------------------------------------------------------------
+ * Project : Telescopic Sight 
+ *			 Low Battery Indication & Brightness Control
+ * Micro controller : AT TINY 13
+ * Pin configuration - PB0/OC0A: LED Output(Pin5)
+ *                   - PB3/ADC3: Intensity Input(Pin2)
+ *                   - PB4/ADC2: Battery Input(Pin3)
+ *-------------------------------------------------------------------*/
+#define F_CPU 9600000UL                                        //System clock 9.6 MHz, built in resonator
+#define LED PB0                                                //LED is connected to PB0 pin5 of AT tiny 13A
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+//Global variables
+volatile int adc_in=0;
+volatile int adc_batt=0;
+
+//Function Declaration
+void adc_setup_ADC3_PB3();
+void adc_setup_ADC2_PB4();
+int adc_read(void);
+void pwm_setup (void);
+
+
+int main (void){
+        DDRB |= (1 << LED);										//Set direction of LED as output
+		pwm_setup();										//select timer clock/pwm mode using PWM set up function
+
+		while(1){
+				adc_setup_ADC3_PB3();                           //Set Input Channel to Intensity Input
+				adc_in=adc_read();                              //Read ADC value 
+				OCR0A = adc_in;                                 //put the value in Output Compare Register A 
+				_delay_ms(10);                            
+				adc_setup_ADC2_PB4();				//Set Input Channel to Battery Input
+				adc_batt = adc_read();                          //Read ADC value
+
+				if(adc_batt <= 170){                           //Check if battery voltage is less than 2V ; if yes then give blinking
+					 OCR0A = 128;                          //LED blinking 50% duty cycle
+					 _delay_ms(100);
+					 OCR0A = 0;
+					 _delay_ms(100);
+				}
+	   }
+}
+
+//Function to set up AD3 as Input
+//ADMUX = 01100011 = 63
+void adc_setup_ADC3_PB3(){
+	ADMUX |= (1 << ADLAR);									// ADC Left Adjust Result
+	ADMUX |= (1 << REFS0);									// Reference Selection Bit :Set Internal Voltage Reference 1.1V.
+	ADMUX |= (1<<MUX0)|(1<<MUX1);								// Set PB3(ADC3) as Intensity Input
+	ADCSRA |= (1 << ADPS2)| (1 << ADPS1) | (1 << ADPS0);					// ADC Prescaler Select Bits : 128 (111) ;  At 9.6 MHz this is 75 kHz.
+	ADCSRA |= (1 << ADEN);									// ADC Enable
+}
+
+//Function to set up AD2 as Input
+//ADMUX = 01100011 = 62
+void adc_setup_ADC2_PB4(){
+	ADMUX |= (1 << ADLAR);									// ADC Left Adjust Result
+	ADMUX |= (1 << REFS0);									// Reference Selection Bit :Set Internal Voltage Reference as 1.1V.
+	ADMUX |= (1<<MUX1);									// Set PB4 as battery input (MUX0 bit 0 and MUX1 bit 1)
+	ADMUX &= ~(1<<MUX0);
+	ADCSRA |= (1 << ADPS2)| (1 << ADPS1) | (1 << ADPS0);	// ADC Prescaler Select Bits : 128 (111) ;  At 9.6 MHz this is 75 kHz.
+	ADCSRA |= (1 << ADEN);									// ADC Enable
+}
+
+//Function to Perform Conversion
+int adc_read(void){
+	ADCSRA |= (1 << ADSC);									// Start the conversion
+	while (ADCSRA & (1 << ADSC));								// Wait for it to finish
+	return ADCH;
+}
+
+//Function to set up PWM parameters
+void pwm_setup (void){
+	TCCR0B |= (1 << CS01);									// Set Timer 0 Pr-escaler to clock/8. At 9.6 MHz this is 1.2 MHz.
+	TCCR0A |= (1 << WGM01) | (1 << WGM00);							// Set to 'Fast PWM' mode
+	TCCR0A |= (1 << COM0A1);								// Clear OC0A output on compare match, set OCOA at TOP
+}
